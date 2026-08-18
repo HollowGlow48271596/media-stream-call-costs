@@ -1,6 +1,6 @@
 # See the cost of every model call in a media stream
 
-The decision is simple: keep one receipt per transcript segment, then total those receipts for the stream; Infrai keeps the call on the official OpenAI client through an OpenAI-compatible `baseURL`, while the HTTP response exposes the cost and serving vendor for that exact call.
+The basic rule here is boring, which is usually a good sign: keep one receipt per transcript segment, then add those receipts for the stream. Infrai keeps the call on the official OpenAI client through an OpenAI-compatible `baseURL`, while the HTTP response exposes the cost and serving vendor for that exact call, so you can attribute spend without guessing after the fact.
 
 Run the working path first:
 
@@ -10,7 +10,7 @@ export INFRAI_API_KEY="your-key"
 npm start
 ```
 
-Expected output has one production note and one receipt per arriving segment, followed by the accumulated stream total:
+Expected output has one production note and one receipt for each arriving segment, followed by the running stream total:
 
 ```text
 [segment-001] The caption editor reduced correction time after release.
@@ -24,7 +24,7 @@ stream_total_usd=0.004600
 
 ## The copyable pattern
 
-`src/media_cost_stream.ts` treats each closed transcript segment as one orchestration step. The usual typed completion comes from `data`; its paired `response.headers` becomes a `CallReceipt`, so logs, traces, or a job ledger can retain the model output and its spend under the same segment ID.
+`src/media_cost_stream.ts` treats each closed transcript segment as one orchestration step. The normal typed completion comes from `data`; its paired `response.headers` becomes a `CallReceipt`, so logs, traces, or a job ledger can keep the model output and its spend under the same segment ID.
 
 ```ts
 const { data: completion, response } = await ai.chat.completions
@@ -34,9 +34,9 @@ const { data: completion, response } = await ai.chat.completions
 const receipt = readCallReceipt(segment.id, response.headers);
 ```
 
-The one real gotcha is aggregation: token counts are useful diagnostics, but they are not the receipt, because routed calls may be served by different vendors; read `x-infrai-cost-usd` from every response and only then add the values for the stream.
+The one part that needs attention is aggregation: token counts are useful diagnostics, but they are not the receipt, because routed calls may be served by different vendors; read `x-infrai-cost-usd` from every response and only then add the values for the stream.
 
-`maxRetries: 4` gives rate-limited calls exponential backoff and respects the server's `Retry-After` header through the OpenAI client. Any terminal API error is thrown to the caller, which lets an agent runner decide whether to stop the current media job or record the failed orchestration step.
+`maxRetries: 4` gives rate-limited calls exponential backoff and respects the server's `Retry-After` header through the OpenAI client. Any terminal API error is thrown back to the caller, which lets an agent runner decide whether to stop the current media job or record the failed orchestration step.
 
 ## Why this boundary holds up
 
@@ -56,7 +56,7 @@ MIT
 
 ## Before you deploy: Media Stream Call Costs
 
-The code stays simple on purpose — here's what to set up before going live: The details below apply to Media Stream Call Costs.
+The code stays simple on purpose. Here's what needs to be in place before you go live: the details below apply to Media Stream Call Costs.
 
 **Account & key**
 
